@@ -11,6 +11,8 @@ import { dirname, join } from "path";
 import adminRoutes from "./routes/admin.js";
 import trackingRoutes from "./routes/tracking.js";
 import { setupSocketHandlers } from "./sockets/index.js";
+import { loadStore, startExpirySweeper } from "./services/trackingStore.js";
+import { initDB } from "./services/db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,9 +52,23 @@ app.get("*", (req, res) => {
   res.sendFile(join(clientDist, "index.html"));
 });
 
-setupSocketHandlers(io);
+async function start() {
+  try {
+    await initDB();
+  } catch (err) {
+    console.error("DB init failed:", err);
+    console.error("Server continuing in memory-only mode until DB is reachable.");
+  }
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Client URL: ${CLIENT_URL}`);
-});
+  setupSocketHandlers(io);
+
+  loadStore();
+  startExpirySweeper();
+
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Client URL: ${CLIENT_URL}`);
+  });
+}
+
+start();
